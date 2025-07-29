@@ -69,8 +69,16 @@ export const authOptions: NextAuthOptions = {
     },
     pages: {
         signIn: "/login",
+        signOut: "/login",
     },
     callbacks: {
+        async redirect({ url, baseUrl }) {
+            // Allows relative callback URLs
+            if (url.startsWith("/")) return `${baseUrl}${url}`;
+            // Allows callback URLs on the same origin
+            else if (new URL(url).origin === baseUrl) return url;
+            return baseUrl;
+        },
         async jwt({ token, user }) {
             if (user) {
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
