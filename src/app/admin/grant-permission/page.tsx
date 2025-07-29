@@ -23,9 +23,11 @@ export default function GrantPermissionPage() {
     const { data: session, status } = useSession();
     const router = useRouter();
     const [csvFile, setCsvFile] = useState<File | null>(null);
+    const [manualEntry, setManualEntry] = useState("");
     const [previewData, setPreviewData] = useState<PermissionData[]>([]);
     const [showPreview, setShowPreview] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
+    const [errors, setErrors] = useState<{ [key: string]: string }>({});
     const [result, setResult] = useState<{
         success: boolean;
         message: string;
@@ -89,6 +91,86 @@ export default function GrantPermissionPage() {
         return permissions;
     };
 
+    const handleManualEntryChange = (
+        e: React.ChangeEvent<HTMLInputElement>
+    ) => {
+        setManualEntry(e.target.value);
+        if (errors.manualEntry) {
+            setErrors((prev) => ({
+                ...prev,
+                manualEntry: "",
+            }));
+        }
+    };
+
+    const parseManualEntry = () => {
+        if (!manualEntry.trim()) {
+            setErrors((prev) => ({
+                ...prev,
+                manualEntry: "Please enter a manual entry to parse",
+            }));
+            return;
+        }
+
+        // Parse the manual entry format: "Name, StudentId, Email"
+        const parts = manualEntry.split(",").map((part) => part.trim());
+
+        if (parts.length !== 3) {
+            setErrors((prev) => ({
+                ...prev,
+                manualEntry:
+                    "Please use the format: Name, StudentId, Email (separated by commas)",
+            }));
+            return;
+        }
+
+        const [name, studentId, email] = parts;
+
+        // Validate student ID (must be 9 digits)
+        if (!/^\d{9}$/.test(studentId)) {
+            setErrors((prev) => ({
+                ...prev,
+                manualEntry: "Student ID must be exactly 9 digits",
+            }));
+            return;
+        }
+
+        // Validate email format
+        if (!email.includes("@") || !email.endsWith("@iut-dhaka.edu")) {
+            setErrors((prev) => ({
+                ...prev,
+                manualEntry: "Email must be a valid IUT email (@iut-dhaka.edu)",
+            }));
+            return;
+        }
+
+        // Check if entry already exists in preview data
+        const existingEntry = previewData.find(
+            (entry) => entry.email === email || entry.studentId === studentId
+        );
+
+        if (existingEntry) {
+            setErrors((prev) => ({
+                ...prev,
+                manualEntry:
+                    "Entry with this email or student ID already exists in the list",
+            }));
+            return;
+        }
+
+        // Add to preview data
+        const newEntry: PermissionData = { name, studentId, email };
+        setPreviewData((prev) => [...prev, newEntry]);
+        setShowPreview(true);
+
+        // Clear manual entry and any errors
+        setManualEntry("");
+        setErrors((prev) => ({
+            ...prev,
+            manualEntry: "",
+        }));
+    };
+
     const handleFileChange = async (
         event: React.ChangeEvent<HTMLInputElement>
     ) => {
@@ -123,7 +205,7 @@ export default function GrantPermissionPage() {
     const handleSubmit = async (event: React.FormEvent) => {
         event.preventDefault();
 
-        if (!csvFile || previewData.length === 0) {
+        if (previewData.length === 0) {
             alert("Please select a CSV file and review the preview");
             return;
         }
@@ -138,8 +220,10 @@ export default function GrantPermissionPage() {
             // Clear file input if successful
             if (response.success && response.addedCount > 0) {
                 setCsvFile(null);
+                setManualEntry("");
                 setPreviewData([]);
                 setShowPreview(false);
+                setErrors({});
                 const fileInput = document.getElementById(
                     "csv-file"
                 ) as HTMLInputElement;
@@ -214,6 +298,51 @@ export default function GrantPermissionPage() {
 
                     {/* Upload Form */}
                     <form onSubmit={handleSubmit} className="space-y-6">
+                        {/* Manual Entry Section */}
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-2">
+                                Manual Entry
+                            </label>
+                            <div className="flex space-x-2">
+                                <input
+                                    type="text"
+                                    value={manualEntry}
+                                    onChange={handleManualEntryChange}
+                                    className={`border ${
+                                        errors.manualEntry
+                                            ? "border-red-500"
+                                            : "border-slate-300"
+                                    } flex-1 p-2 rounded-md focus:outline-slate-400 text-sm`}
+                                    placeholder="e.g., Tanvir Hossain Dihan, 200041144, tanvirhossain20@iut-dhaka.edu"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={parseManualEntry}
+                                    className="rounded-lg bg-slate-800 py-3 px-4 border border-transparent text-center text-sm text-white transition-all shadow-md hover:shadow-lg focus:bg-slate-700 focus:shadow-none active:bg-slate-700 hover:bg-slate-700 active:shadow-none disabled:pointer-events-none disabled:opacity-50 disabled:shadow-none cursor-pointer font-semibold focus:ring-offset-2 "
+                                >
+                                    Parse
+                                </button>
+                            </div>
+                            {errors.manualEntry && (
+                                <p className="text-red-500 text-xs mt-1">
+                                    {errors.manualEntry}
+                                </p>
+                            )}
+                            <p className="text-xs text-slate-500 mt-1">
+                                Format: Name, Student ID (9 digits), Email
+                                (separated by commas)
+                            </p>
+                        </div>
+
+                        {/* Divider */}
+                        <div className="flex items-center justify-center">
+                            <div className="flex items-center space-x-2 text-sm text-slate-500">
+                                <div className="h-px bg-slate-300 flex-1"></div>
+                                <span className="px-2">OR</span>
+                                <div className="h-px bg-slate-300 flex-1"></div>
+                            </div>
+                        </div>
+
                         <div>
                             <label
                                 htmlFor="csv-file"
@@ -259,9 +388,11 @@ export default function GrantPermissionPage() {
                                         type="button"
                                         onClick={() => {
                                             setCsvFile(null);
+                                            setManualEntry("");
                                             setPreviewData([]);
                                             setShowPreview(false);
                                             setResult(null);
+                                            setErrors({});
                                             const fileInput =
                                                 document.getElementById(
                                                     "csv-file"
@@ -333,9 +464,8 @@ export default function GrantPermissionPage() {
                         <button
                             type="submit"
                             disabled={
-                                !csvFile ||
-                                !showPreview ||
                                 previewData.length === 0 ||
+                                !showPreview ||
                                 isLoading
                             }
                             className="w-full rounded-md bg-slate-800 py-3 px-4 border border-transparent text-center text-sm text-white transition-all shadow-md hover:shadow-lg focus:bg-slate-700 focus:shadow-none active:bg-slate-700 hover:bg-slate-700 active:shadow-none disabled:pointer-events-none disabled:opacity-50 disabled:shadow-none cursor-pointer font-semibold"
