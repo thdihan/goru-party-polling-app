@@ -156,6 +156,11 @@ export default function Home() {
                                         session.user?.studentId
                                 );
                             })
+                            .sort(
+                                (a, b) =>
+                                    Number(a.permission.studentId) -
+                                    Number(b.permission.studentId)
+                            )
                             .map((poll) => {
                                 // const totalVotes = poll.names.reduce(
                                 //     (sum, name) => sum + name.votes.length,
@@ -179,6 +184,7 @@ export default function Home() {
                                         studentId={poll.permission.studentId}
                                         topVotedName={topName?.value || null}
                                         totalVotes={topName?.votes?.length || 0}
+                                        isAdmin={session.user.role === "admin"}
                                     />
                                 );
                             })}

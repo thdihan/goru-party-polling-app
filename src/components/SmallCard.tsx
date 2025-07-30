@@ -8,6 +8,7 @@ interface SmallCardProps {
     studentId: string;
     topVotedName: string | null;
     totalVotes: number;
+    isAdmin: boolean;
 }
 
 const randomColor = ["#E25130", "#54963E", "#7F4D94", "#EFAD20", "#1387B9"];
@@ -18,6 +19,7 @@ const SmallCard = ({
     studentId,
     topVotedName,
     totalVotes,
+    isAdmin,
 }: SmallCardProps) => {
     const router = useRouter();
     const bgColor = useMemo(() => {
@@ -44,7 +46,7 @@ const SmallCard = ({
                 </div>
                 <div className="text-center">
                     <h3 className="my-2 font-bold text-xl text-[#1387B9]">
-                        {topVotedName || ""}
+                        {isAdmin && topVotedName ? topVotedName : "***"}
                     </h3>
                     {totalVotes > 0 && (
                         <p className="text-xs text-slate-500">
@@ -57,7 +59,7 @@ const SmallCard = ({
                     onClick={() => router.push(`/poll/${pollId}`)}
                     className="rounded-md bg-slate-800 py-1 px-4 border border-transparent text-center text-sm text-white transition-all shadow-md hover:shadow-lg focus:bg-slate-700 focus:shadow-none active:bg-slate-700 hover:bg-slate-700 active:shadow-none disabled:pointer-events-none disabled:opacity-50 disabled:shadow-none cursor-pointer font-semibold w-full"
                 >
-                    Vote
+                    View Poll
                 </button>
             </div>
         </div>

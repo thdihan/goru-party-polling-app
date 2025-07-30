@@ -228,7 +228,7 @@ const SingleName = ({
                         Voted by ({uniqueVoters.length})
                     </h4>
                     <div className="space-y-2 max-h-32 overflow-y-auto">
-                        {uniqueVoters.map((vote) => (
+                        {uniqueVoters.map((vote, index) => (
                             <div
                                 key={vote.id}
                                 className="flex items-center space-x-3"
@@ -238,10 +238,7 @@ const SingleName = ({
                                     style={{
                                         backgroundColor:
                                             randomColor[
-                                                Math.floor(
-                                                    Math.random() *
-                                                        randomColor.length
-                                                )
+                                                index % randomColor.length
                                             ],
                                     }}
                                 >
