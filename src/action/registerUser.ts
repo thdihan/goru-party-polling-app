@@ -171,11 +171,13 @@ const registerUser = async (userData: {
                 });
 
                 // Send verification email
+                console.log("EMAIL VERIFICATION CALLING  -> START");
                 const emailSent = await emailService.sendVerificationEmail(
                     normalizedEmail,
                     verificationCode,
                     name.trim()
                 );
+                console.log("EMAIL VERIFICATION CALLING  -> DONE");
 
                 if (!emailSent) {
                     return {

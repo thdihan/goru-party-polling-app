@@ -16,11 +16,14 @@ class EmailService {
     private isDevelopment = process.env.NODE_ENV === "development";
 
     constructor() {
+        console.log("EMAIL TRANSPORTER INIT -> START");
         this.initializeTransporter();
+        console.log("EMAIL TRANSPORTER INIT -> DONE");
     }
 
     private async initializeTransporter() {
         try {
+            console.log("EMAIL TRANSPORTER INIT -> PROCESSING");
             if (this.isDevelopment) {
                 // In development, we'll still log to console but also try to send if credentials are provided
                 console.log(
@@ -62,18 +65,21 @@ class EmailService {
                     "EmailService: Gmail transporter configured successfully"
                 );
             }
+            console.log("EMAIL TRANSPORTER INIT -> PROCESSED");
         } catch (error) {
             console.error(
                 "EmailService: Failed to initialize Gmail transporter:",
                 error
             );
             this.transporter = null;
+            console.log("EMAIL TRANSPORTER INIT -> ERROR");
         }
     }
 
     async sendEmail(options: EmailOptions): Promise<boolean> {
         try {
             // Always log in development for debugging
+            console.log("EMAIL SENDING  -> START");
             if (this.isDevelopment) {
                 console.log("=== EMAIL SENT (Development Mode) ===");
                 console.log("To:", options.to);
