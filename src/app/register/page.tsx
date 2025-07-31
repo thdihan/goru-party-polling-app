@@ -102,6 +102,13 @@ const Register = () => {
                     password: "",
                     confirmPassword: "",
                 });
+
+                // If verification is required, redirect to verification page after a short delay
+                if (result.requiresVerification) {
+                    setTimeout(() => {
+                        window.location.href = "/verify-email";
+                    }, 3000);
+                }
             } else {
                 setSuccessMessage("");
                 setServerErrors(result.errors);
@@ -283,12 +290,19 @@ const Register = () => {
                         <p className="text-sm text-green-700 mt-1">
                             {successMessage}
                         </p>
-                        <div className="mt-3">
+                        <div className="mt-3 space-y-2">
                             <Link
-                                href="/login"
+                                href="/verify-email"
                                 className="inline-flex items-center text-sm text-green-700 hover:text-green-800 underline font-medium"
                             >
-                                Go to Login Page →
+                                Verify Email Now →
+                            </Link>
+                            <br />
+                            <Link
+                                href="/login"
+                                className="inline-flex items-center text-sm text-gray-600 hover:text-gray-800 underline"
+                            >
+                                Go to Login Page
                             </Link>
                         </div>
                     </div>

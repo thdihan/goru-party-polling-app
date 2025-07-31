@@ -147,6 +147,16 @@ const Login = () => {
                             </h4>
                         </div>
                         <p className="text-sm text-red-700 mt-1">{error}</p>
+                        {error.includes("verify your email") && (
+                            <div className="mt-2">
+                                <Link
+                                    href="/verify-email"
+                                    className="inline-flex items-center text-sm text-blue-600 hover:text-blue-800 underline font-medium"
+                                >
+                                    Verify Email Now →
+                                </Link>
+                            </div>
+                        )}
                     </div>
                 )}
 
@@ -158,6 +168,15 @@ const Login = () => {
                             className="text-party-orange hover:underline font-semibold"
                         >
                             Register here
+                        </Link>
+                    </p>
+                    <p className="text-sm text-gray-600 mt-2">
+                        Need to verify your email?{" "}
+                        <Link
+                            href="/verify-email"
+                            className="text-blue-600 hover:text-blue-800 underline"
+                        >
+                            Verify here
                         </Link>
                     </p>
                 </div>

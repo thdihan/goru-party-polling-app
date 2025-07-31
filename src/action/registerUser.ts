@@ -2,6 +2,11 @@
 
 import { PrismaClient } from "@/generated/prisma";
 import bcrypt from "bcryptjs";
+import emailService from "@/lib/emailService";
+import {
+    generateVerificationCode,
+    getVerificationExpiry,
+} from "@/lib/emailVerification";
 
 const prisma = new PrismaClient();
 
@@ -9,6 +14,7 @@ interface RegisterUserResult {
     success: boolean;
     message: string;
     errors: string[];
+    requiresVerification?: boolean;
 }
 
 const registerUser = async (userData: {
@@ -127,24 +133,64 @@ const registerUser = async (userData: {
         });
 
         if (existingUser) {
-            if (existingUser.email === normalizedEmail) {
-                return {
-                    success: false,
-                    message: "User already exists",
-                    errors: [
-                        "An account with this email address already exists.",
-                        "Please try logging in instead.",
-                        "If you forgot your password, use the password reset feature.",
-                    ],
-                };
+            if (existingUser.emailVerified) {
+                // User exists and is verified
+                if (existingUser.email === normalizedEmail) {
+                    return {
+                        success: false,
+                        message: "User already exists",
+                        errors: [
+                            "An account with this email address already exists.",
+                            "Please try logging in instead.",
+                            "If you forgot your password, use the password reset feature.",
+                        ],
+                    };
+                } else {
+                    return {
+                        success: false,
+                        message: "Student ID already registered",
+                        errors: [
+                            "An account with this Student ID already exists.",
+                            "Please check your Student ID or contact support.",
+                        ],
+                    };
+                }
             } else {
+                // User exists but not verified - update with new verification code
+                const verificationCode = generateVerificationCode();
+                const verificationExpiry = getVerificationExpiry();
+
+                await prisma.user.update({
+                    where: { id: existingUser.id },
+                    data: {
+                        name: name.trim(), // Update name in case it changed
+                        emailVerificationCode: verificationCode,
+                        emailVerificationExpires: verificationExpiry,
+                        password: await bcrypt.hash(password, 12), // Update password
+                    },
+                });
+
+                // Send verification email
+                const emailSent = await emailService.sendVerificationEmail(
+                    normalizedEmail,
+                    verificationCode,
+                    name.trim()
+                );
+
+                if (!emailSent) {
+                    return {
+                        success: false,
+                        message: "Failed to send verification email",
+                        errors: ["Please try again later or contact support."],
+                    };
+                }
+
                 return {
-                    success: false,
-                    message: "Student ID already registered",
-                    errors: [
-                        "An account with this Student ID already exists.",
-                        "Please check your Student ID or contact support.",
-                    ],
+                    success: true,
+                    message:
+                        "Verification email sent! Please check your email and enter the verification code.",
+                    errors: [],
+                    requiresVerification: true,
                 };
             }
         }
@@ -153,14 +199,21 @@ const registerUser = async (userData: {
         const saltRounds = 12;
         const hashedPassword = await bcrypt.hash(password, saltRounds);
 
-        // Create user
+        // Generate verification code
+        const verificationCode = generateVerificationCode();
+        const verificationExpiry = getVerificationExpiry();
+
+        // Create user with verification code (not verified yet)
         const newUser = await prisma.user.create({
             data: {
                 name: name.trim(),
                 email: normalizedEmail,
                 studentId: normalizedStudentId,
                 password: hashedPassword,
-                role: "user", // Default role
+                role: "user",
+                emailVerificationCode: verificationCode,
+                emailVerificationExpires: verificationExpiry,
+                emailVerified: null, // Not verified yet
             },
             select: {
                 id: true,
@@ -171,10 +224,28 @@ const registerUser = async (userData: {
             },
         });
 
+        // Send verification email
+        const emailSent = await emailService.sendVerificationEmail(
+            normalizedEmail,
+            verificationCode,
+            name.trim()
+        );
+
+        if (!emailSent) {
+            // If email sending fails, delete the user and return error
+            await prisma.user.delete({ where: { id: newUser.id } });
+            return {
+                success: false,
+                message: "Failed to send verification email",
+                errors: ["Please try again later or contact support."],
+            };
+        }
+
         return {
             success: true,
-            message: `Registration successful! Welcome ${newUser.name}. You can now log in with your credentials.`,
+            message: `Registration successful! A verification email has been sent to ${normalizedEmail}. Please check your email and enter the verification code to complete your registration.`,
             errors: [],
+            requiresVerification: true,
         };
     } catch (error) {
         console.error("Registration error:", error);
