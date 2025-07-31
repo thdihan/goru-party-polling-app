@@ -2,27 +2,21 @@
 
 import { PrismaClient } from "@/generated/prisma";
 import bcrypt from "bcryptjs";
-import emailService from "@/lib/emailService";
-import {
-    generateVerificationCode,
-    getVerificationExpiry,
-} from "@/lib/emailVerification";
 
 const prisma = new PrismaClient();
 
-interface RegisterUserResult {
+interface CompleteRegistrationResult {
     success: boolean;
     message: string;
     errors: string[];
-    requiresVerification?: boolean;
 }
 
-const registerUser = async (userData: {
+const completeRegistration = async (userData: {
     name: string;
     email: string;
     studentId: string;
     password: string;
-}): Promise<RegisterUserResult> => {
+}): Promise<CompleteRegistrationResult> => {
     try {
         const { name, email, studentId, password } = userData;
 
@@ -59,27 +53,17 @@ const registerUser = async (userData: {
             };
         }
 
-        // Validate email format and domain
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(email)) {
-            return {
-                success: false,
-                message: "Invalid email format",
-                errors: ["Please enter a valid email address"],
-            };
-        }
-
+        // Validate email format
         if (!email.endsWith("@iut-dhaka.edu")) {
             return {
                 success: false,
                 message: "Invalid email domain",
-                errors: ["Please use your IUT email address (@iut-dhaka.edu)"],
+                errors: ["Only IUT email addresses are allowed"],
             };
         }
 
-        // Validate student ID format
-        const studentIdRegex = /^\d{9}$/;
-        if (!studentIdRegex.test(studentId.trim())) {
+        // Validate student ID format (9 digits)
+        if (!/^\d{9}$/.test(studentId.trim())) {
             return {
                 success: false,
                 message: "Invalid Student ID format",
@@ -133,66 +117,23 @@ const registerUser = async (userData: {
         });
 
         if (existingUser) {
-            if (existingUser.emailVerified) {
-                // User exists and is verified
-                if (existingUser.email === normalizedEmail) {
-                    return {
-                        success: false,
-                        message: "User already exists",
-                        errors: [
-                            "An account with this email address already exists.",
-                            "Please try logging in instead.",
-                            "If you forgot your password, use the password reset feature.",
-                        ],
-                    };
-                } else {
-                    return {
-                        success: false,
-                        message: "Student ID already registered",
-                        errors: [
-                            "An account with this Student ID already exists.",
-                            "Please check your Student ID or contact support.",
-                        ],
-                    };
-                }
-            } else {
-                // User exists but not verified - update with new verification code
-                const verificationCode = generateVerificationCode();
-                const verificationExpiry = getVerificationExpiry();
-
-                await prisma.user.update({
-                    where: { id: existingUser.id },
-                    data: {
-                        name: name.trim(), // Update name in case it changed
-                        emailVerificationCode: verificationCode,
-                        emailVerificationExpires: verificationExpiry,
-                        password: await bcrypt.hash(password, 12), // Update password
-                    },
-                });
-
-                // Send verification email
-                console.log("EMAIL VERIFICATION CALLING  -> START");
-                const emailSent = await emailService.sendVerificationEmail(
-                    normalizedEmail,
-                    verificationCode,
-                    name.trim()
-                );
-                console.log("EMAIL VERIFICATION CALLING  -> DONE");
-
-                if (!emailSent) {
-                    return {
-                        success: false,
-                        message: "Failed to send verification email",
-                        errors: ["Please try again later or contact support."],
-                    };
-                }
-
+            if (existingUser.email === normalizedEmail) {
                 return {
-                    success: true,
-                    message:
-                        "Verification email sent! Please check your email and enter the verification code.",
-                    errors: [],
-                    requiresVerification: true,
+                    success: false,
+                    message: "User already exists",
+                    errors: [
+                        "An account with this email address already exists.",
+                        "Please try logging in instead.",
+                    ],
+                };
+            } else {
+                return {
+                    success: false,
+                    message: "Student ID already registered",
+                    errors: [
+                        "An account with this Student ID already exists.",
+                        "Please check your Student ID or contact support.",
+                    ],
                 };
             }
         }
@@ -201,11 +142,7 @@ const registerUser = async (userData: {
         const saltRounds = 12;
         const hashedPassword = await bcrypt.hash(password, saltRounds);
 
-        // Generate verification code
-        const verificationCode = generateVerificationCode();
-        const verificationExpiry = getVerificationExpiry();
-
-        // Create user with verification code (not verified yet)
+        // Create user (already verified since they used Google OAuth)
         const newUser = await prisma.user.create({
             data: {
                 name: name.trim(),
@@ -213,9 +150,7 @@ const registerUser = async (userData: {
                 studentId: normalizedStudentId,
                 password: hashedPassword,
                 role: "user",
-                emailVerificationCode: verificationCode,
-                emailVerificationExpires: verificationExpiry,
-                emailVerified: null, // Not verified yet
+                emailVerified: new Date(), // Mark as verified since they used Google OAuth
             },
             select: {
                 id: true,
@@ -226,31 +161,13 @@ const registerUser = async (userData: {
             },
         });
 
-        // Send verification email
-        const emailSent = await emailService.sendVerificationEmail(
-            normalizedEmail,
-            verificationCode,
-            name.trim()
-        );
-
-        if (!emailSent) {
-            // If email sending fails, delete the user and return error
-            await prisma.user.delete({ where: { id: newUser.id } });
-            return {
-                success: false,
-                message: "Failed to send verification email",
-                errors: ["Please try again later or contact support."],
-            };
-        }
-
         return {
             success: true,
-            message: `Registration successful! A verification email has been sent to ${normalizedEmail}. Please check your email and enter the verification code to complete your registration.`,
+            message: `Registration completed successfully! Welcome ${newUser.name}.`,
             errors: [],
-            requiresVerification: true,
         };
     } catch (error) {
-        console.error("Registration error:", error);
+        console.error("Registration completion error:", error);
 
         // Handle specific Prisma errors
         if (error instanceof Error) {
@@ -258,7 +175,7 @@ const registerUser = async (userData: {
                 return {
                     success: false,
                     message: "User already exists",
-                    errors: ["An account with this email already exists"],
+                    errors: ["An account with this information already exists"],
                 };
             }
 
@@ -283,4 +200,4 @@ const registerUser = async (userData: {
     }
 };
 
-export default registerUser;
+export default completeRegistration;

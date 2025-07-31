@@ -1,15 +1,23 @@
 import { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
-import { PrismaAdapter } from "@auth/prisma-adapter";
+import GoogleProvider from "next-auth/providers/google";
 import { PrismaClient } from "@/generated/prisma";
 import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
 
 export const authOptions: NextAuthOptions = {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    adapter: PrismaAdapter(prisma) as any,
     providers: [
+        GoogleProvider({
+            clientId: process.env.GOOGLE_CLIENT_ID!,
+            clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+            authorization: {
+                params: {
+                    scope: "openid email profile",
+                    hd: "iut-dhaka.edu", // Restrict to IUT domain
+                },
+            },
+        }),
         CredentialsProvider({
             name: "credentials",
             credentials: {
@@ -79,6 +87,45 @@ export const authOptions: NextAuthOptions = {
         signOut: "/login",
     },
     callbacks: {
+        async signIn({ account, profile }) {
+            // Allow credentials login (existing users)
+            if (account?.provider === "credentials") {
+                return true;
+            }
+
+            // Handle Google OAuth
+            if (account?.provider === "google" && profile?.email) {
+                // Check if email is from IUT domain
+                if (!profile.email.endsWith("@iut-dhaka.edu")) {
+                    return false;
+                }
+
+                // Check if email has permission
+                const permission = await prisma.permission.findUnique({
+                    where: { email: profile.email.toLowerCase().trim() },
+                });
+
+                if (!permission) {
+                    return false; // No permission found
+                }
+
+                // Check if user already exists
+                const existingUser = await prisma.user.findUnique({
+                    where: { email: profile.email.toLowerCase().trim() },
+                });
+
+                if (existingUser) {
+                    // User exists, allow login
+                    return true;
+                } else {
+                    // User doesn't exist, they need to complete registration
+                    // We'll allow the sign in but handle registration in the session callback
+                    return true;
+                }
+            }
+
+            return false;
+        },
         async redirect({ url, baseUrl }) {
             // Allows relative callback URLs
             if (url.startsWith("/")) return `${baseUrl}${url}`;
@@ -86,23 +133,82 @@ export const authOptions: NextAuthOptions = {
             else if (new URL(url).origin === baseUrl) return url;
             return baseUrl;
         },
-        async jwt({ token, user }) {
-            if (user) {
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                token.role = (user as any).role;
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                token.studentId = (user as any).studentId;
+        async jwt({ token, user, account, profile }) {
+            if (account?.provider === "google" && profile?.email) {
+                // Store Google profile information
+                token.email = profile.email.toLowerCase().trim();
+                token.name = profile.name || "Unknown User";
+
+                // Get profile picture from Google profile
+                const googleProfile = profile as {
+                    picture?: string;
+                    image?: string;
+                };
+                token.picture =
+                    googleProfile.picture || googleProfile.image || "";
+
+                try {
+                    // Check if user exists in our database
+                    const dbUser = await prisma.user.findUnique({
+                        where: { email: profile.email.toLowerCase().trim() },
+                    });
+
+                    if (dbUser) {
+                        // User exists, add user info to token
+                        token.id = dbUser.id;
+                        token.role = dbUser.role;
+                        token.studentId = dbUser.studentId;
+                        token.needsRegistration = false;
+                    } else {
+                        // User doesn't exist, they need to complete registration
+                        token.role = "user";
+                        token.needsRegistration = true;
+                        // Don't set token.id for new users to avoid confusion
+                    }
+                } catch (error) {
+                    console.error("Error checking user in database:", error);
+                    // In case of database error, assume they need registration
+                    token.role = "user";
+                    token.needsRegistration = true;
+                }
+            } else if (user) {
+                // Credentials login - properly type the user object
+                const userWithRole = user as {
+                    id: string;
+                    role: string;
+                    studentId: string;
+                };
+                token.id = userWithRole.id;
+                token.role = userWithRole.role;
+                token.studentId = userWithRole.studentId;
+                token.needsRegistration = false;
             }
+
             return token;
         },
         async session({ session, token }) {
             if (token && session.user) {
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                (session.user as any).id = token.sub!;
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                (session.user as any).role = token.role;
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                (session.user as any).studentId = token.studentId;
+                // Extend the session user object with our custom properties
+                const extendedUser = session.user as {
+                    id?: string;
+                    role?: string;
+                    studentId?: string;
+                    needsRegistration?: boolean;
+                    name?: string | null;
+                    email?: string | null;
+                    image?: string | null;
+                };
+
+                extendedUser.id = (token.id as string) || token.sub || "";
+                extendedUser.role = (token.role as string) || "user";
+                extendedUser.studentId = (token.studentId as string) || "";
+                extendedUser.needsRegistration =
+                    (token.needsRegistration as boolean) || false;
+
+                // Set user profile information
+                extendedUser.name = (token.name as string) || "Unknown User";
+                extendedUser.email = (token.email as string) || "";
+                extendedUser.image = (token.picture as string) || "";
             }
             return session;
         },
