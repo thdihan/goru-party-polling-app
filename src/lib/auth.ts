@@ -111,9 +111,11 @@ export const authOptions: NextAuthOptions = {
                     // User exists, allow login
                     return true;
                 } else {
-                    // User doesn't exist, they need to complete registration
-                    // We'll allow the sign in but handle registration in the session callback
-                    return true;
+                    // User doesn't exist, they need to register first
+                    // Redirect to registration page instead of auto-login
+                    return `/register?email=${encodeURIComponent(
+                        profile.email
+                    )}`;
                 }
             }
 
@@ -141,7 +143,7 @@ export const authOptions: NextAuthOptions = {
                     googleProfile.picture || googleProfile.image || "";
 
                 try {
-                    // Check if user exists in our database
+                    // User must exist in database (checked in signIn callback)
                     const dbUser = await prisma.user.findUnique({
                         where: { email: profile.email.toLowerCase().trim() },
                     });
@@ -153,16 +155,12 @@ export const authOptions: NextAuthOptions = {
                         token.studentId = dbUser.studentId;
                         token.needsRegistration = false;
                     } else {
-                        // User doesn't exist, they need to complete registration
-                        token.role = "user";
-                        token.needsRegistration = true;
-                        // Don't set token.id for new users to avoid confusion
+                        // This shouldn't happen since signIn callback would have redirected
+                        throw new Error("User not found in database");
                     }
                 } catch (error) {
                     console.error("Error checking user in database:", error);
-                    // In case of database error, assume they need registration
-                    token.role = "user";
-                    token.needsRegistration = true;
+                    throw error; // Fail the login
                 }
             } else if (user) {
                 // Credentials login - properly type the user object
@@ -186,7 +184,6 @@ export const authOptions: NextAuthOptions = {
                     id?: string;
                     role?: string;
                     studentId?: string;
-                    needsRegistration?: boolean;
                     name?: string | null;
                     email?: string | null;
                     image?: string | null;
@@ -195,8 +192,6 @@ export const authOptions: NextAuthOptions = {
                 extendedUser.id = (token.id as string) || token.sub || "";
                 extendedUser.role = (token.role as string) || "user";
                 extendedUser.studentId = (token.studentId as string) || "";
-                extendedUser.needsRegistration =
-                    (token.needsRegistration as boolean) || false;
 
                 // Set user profile information
                 extendedUser.name = (token.name as string) || "Unknown User";

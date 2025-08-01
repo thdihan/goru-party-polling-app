@@ -5,26 +5,13 @@ import logo from "@/images/logo.png";
 import Link from "next/link";
 import { FiCheck, FiAlertCircle } from "react-icons/fi";
 import { useSession, signIn } from "next-auth/react";
+import { useSearchParams, useRouter } from "next/navigation";
 import completeRegistration from "@/action/completeRegistration";
 
-// Extend the session type to include needsRegistration
-interface ExtendedUser {
-    id?: string;
-    name?: string | null;
-    email?: string | null;
-    image?: string | null;
-    needsRegistration?: boolean;
-}
-
-interface ExtendedSession {
-    user?: ExtendedUser;
-}
-
 const Register = () => {
-    const { data: session, status } = useSession() as {
-        data: ExtendedSession | null;
-        status: string;
-    };
+    const { data: session, status } = useSession();
+    const searchParams = useSearchParams();
+    const router = useRouter();
     const [formData, setFormData] = useState({
         name: "",
         email: "",
@@ -37,22 +24,23 @@ const Register = () => {
     const [successMessage, setSuccessMessage] = useState("");
     const [serverErrors, setServerErrors] = useState<string[]>([]);
 
-    // Pre-fill email when user is authenticated with Google
+    // Pre-fill email from URL parameter (from Google OAuth redirect)
     useEffect(() => {
-        if (session?.user?.email && session?.user?.needsRegistration) {
+        const emailParam = searchParams.get("email");
+        if (emailParam) {
             setFormData((prev) => ({
                 ...prev,
-                email: session.user!.email!,
+                email: emailParam,
             }));
         }
-    }, [session]);
+    }, [searchParams]);
 
-    // Redirect if user is already registered
+    // Redirect if user is already logged in
     useEffect(() => {
-        if (session?.user && !session?.user?.needsRegistration) {
-            window.location.href = "/";
+        if (status === "authenticated" && session?.user) {
+            router.push("/");
         }
-    }, [session]);
+    }, [session, status, router]);
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value } = e.target;
@@ -107,12 +95,6 @@ const Register = () => {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
-        // Check if user is authenticated with Google
-        if (!session?.user?.email) {
-            setErrors({ submit: "Please sign in with Google first" });
-            return;
-        }
-
         if (!validateForm()) {
             return;
         }
@@ -138,15 +120,15 @@ const Register = () => {
                 // Reset form on success
                 setFormData({
                     name: "",
-                    email: session.user.email,
+                    email: "",
                     studentId: "",
                     password: "",
                     confirmPassword: "",
                 });
 
-                // Redirect to home page after successful registration
+                // Redirect to login page after successful registration
                 setTimeout(() => {
-                    window.location.href = "/";
+                    router.push("/login");
                 }, 2000);
             } else {
                 setSuccessMessage("");
@@ -189,8 +171,13 @@ const Register = () => {
         );
     }
 
-    // If user is not authenticated with Google, show Google sign-in
-    if (!session?.user?.email || !session.user?.needsRegistration) {
+    // If user is already logged in, redirect to home
+    if (status === "authenticated" && session?.user) {
+        return null; // Will be redirected by useEffect
+    }
+
+    // If no email from URL parameter, show Google sign-in
+    if (!formData.email) {
         return (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-gradient-to-br from-pink-200 via-yellow-100 to-sky-200 p-4">
                 <div className="backdrop-blur-md bg-white/40 border border-gray-300 w-full md:max-w-[35%] p-8 shadow-lg rounded-lg">
@@ -258,7 +245,7 @@ const Register = () => {
         );
     }
 
-    // User is authenticated with Google and needs to complete registration
+    // Show registration form (either from URL parameter or direct access)
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-gradient-to-br from-pink-200 via-yellow-100 to-sky-200 p-4">
             <div className="backdrop-blur-md bg-white/40 border border-gray-300 w-full md:max-w-[35%] p-8 shadow-lg rounded-lg">
@@ -268,10 +255,12 @@ const Register = () => {
                 <h2 className="text-center font-semibold mb-4 text-xl">
                     Complete Your Registration
                 </h2>
-                <p className="text-center text-sm text-gray-600 mb-6">
-                    Authenticated as:{" "}
-                    <span className="font-medium">{session.user.email}</span>
-                </p>
+                {formData.email && (
+                    <p className="text-center text-sm text-gray-600 mb-6">
+                        Registering with:{" "}
+                        <span className="font-medium">{formData.email}</span>
+                    </p>
+                )}
 
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div>
@@ -299,13 +288,29 @@ const Register = () => {
                             type="email"
                             name="email"
                             value={formData.email}
-                            disabled
-                            className="border border-gray-300 w-full p-2 rounded-md bg-gray-100 text-gray-600 text-sm cursor-not-allowed"
-                            placeholder="Email (verified with Google)"
+                            onChange={handleInputChange}
+                            disabled={!!searchParams.get("email")}
+                            className={`border border-gray-300 w-full p-2 rounded-md text-sm ${
+                                searchParams.get("email")
+                                    ? "bg-gray-100 text-gray-600 cursor-not-allowed"
+                                    : "focus:outline-gray-400"
+                            }`}
+                            placeholder="Email (@iut-dhaka.edu)"
                         />
-                        <p className="text-xs text-gray-500 mt-1">
-                            Email is verified through Google authentication
-                        </p>
+                        {searchParams.get("email") ? (
+                            <p className="text-xs text-gray-500 mt-1">
+                                Email verified through Google authentication
+                            </p>
+                        ) : (
+                            <p className="text-xs text-gray-500 mt-1">
+                                Must be a valid IUT email address
+                            </p>
+                        )}
+                        {errors.email && (
+                            <p className="text-red-500 text-xs mt-1">
+                                {errors.email}
+                            </p>
+                        )}
                     </div>
 
                     <div>
@@ -420,7 +425,7 @@ const Register = () => {
                             {successMessage}
                         </p>
                         <p className="text-sm text-green-600 mt-2">
-                            Redirecting to home page...
+                            Redirecting to login page...
                         </p>
                     </div>
                 )}
