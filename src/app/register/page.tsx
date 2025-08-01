@@ -1,6 +1,6 @@
 "use client";
 import Image from "next/image";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, Suspense } from "react";
 import logo from "@/images/logo.png";
 import Link from "next/link";
 import { FiCheck, FiAlertCircle } from "react-icons/fi";
@@ -8,7 +8,7 @@ import { useSession, signIn } from "next-auth/react";
 import { useSearchParams, useRouter } from "next/navigation";
 import completeRegistration from "@/action/completeRegistration";
 
-const Register = () => {
+const RegisterForm = () => {
     const { data: session, status } = useSession();
     const searchParams = useSearchParams();
     const router = useRouter();
@@ -480,6 +480,23 @@ const Register = () => {
                 </div>
             </div>
         </div>
+    );
+};
+
+const Register = () => {
+    return (
+        <Suspense
+            fallback={
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-gradient-to-br from-pink-200 via-yellow-100 to-sky-200">
+                    <div className="text-center">
+                        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-slate-800"></div>
+                        <p className="mt-4 text-lg font-semibold">Loading...</p>
+                    </div>
+                </div>
+            }
+        >
+            <RegisterForm />
+        </Suspense>
     );
 };
 

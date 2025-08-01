@@ -153,7 +153,6 @@ export const authOptions: NextAuthOptions = {
                         token.id = dbUser.id;
                         token.role = dbUser.role;
                         token.studentId = dbUser.studentId;
-                        token.needsRegistration = false;
                     } else {
                         // This shouldn't happen since signIn callback would have redirected
                         throw new Error("User not found in database");
@@ -172,7 +171,6 @@ export const authOptions: NextAuthOptions = {
                 token.id = userWithRole.id;
                 token.role = userWithRole.role;
                 token.studentId = userWithRole.studentId;
-                token.needsRegistration = false;
             }
 
             return token;
