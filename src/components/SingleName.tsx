@@ -94,41 +94,42 @@ const SingleName = ({
                         <div className="flex items-center space-x-2 mb-2">
                             {totalVotes > 0 && (
                                 <>
-                                    <div className="flex items-center space-x-1">
-                                        <div className="flex -space-x-1">
-                                            {displayVoters.map(
-                                                (vote, index) => (
-                                                    <div
-                                                        key={vote.id}
-                                                        className="w-6 h-6 rounded-full border-2 border-white flex items-center justify-center text-xs font-medium text-white shadow-sm"
-                                                        style={{
-                                                            backgroundColor:
-                                                                randomColor[
-                                                                    index %
-                                                                        randomColor.length
-                                                                ],
-                                                        }}
-                                                        title={`${vote.voter.name} (${vote.voter.studentId})`}
-                                                    >
-                                                        {vote.voter.name
-                                                            .charAt(0)
-                                                            .toUpperCase()}
-                                                    </div>
-                                                )
-                                            )}
-                                            {remainingVoters > 0 && (
+                                    <div className="flex items-center space-x-1 ">
+                                        <div className="flex -space-x-1 mr-2">
+                                            {isAdmin &&
+                                                displayVoters.map(
+                                                    (vote, index) => (
+                                                        <div
+                                                            key={vote.id}
+                                                            className="w-6 h-6 rounded-full border-2 border-white flex items-center justify-center text-xs font-medium text-white shadow-sm"
+                                                            style={{
+                                                                backgroundColor:
+                                                                    randomColor[
+                                                                        index %
+                                                                            randomColor.length
+                                                                    ],
+                                                            }}
+                                                            title={`${vote.voter.name} (${vote.voter.studentId})`}
+                                                        >
+                                                            {vote.voter.name
+                                                                .charAt(0)
+                                                                .toUpperCase()}
+                                                        </div>
+                                                    )
+                                                )}
+                                            {isAdmin && remainingVoters > 0 && (
                                                 <div className="w-6 h-6 rounded-full border-2 border-white bg-gray-500 flex items-center justify-center text-xs font-medium text-white shadow-sm">
                                                     +{remainingVoters}
                                                 </div>
                                             )}
                                         </div>
-                                        <span className="text-sm text-gray-600 ml-2">
+                                        <span className="text-sm text-gray-600">
                                             {totalVotes} vote
                                             {totalVotes !== 1 ? "s" : ""}
                                         </span>
                                     </div>
 
-                                    {totalVotes > 0 && (
+                                    {isAdmin && totalVotes > 0 && (
                                         <button
                                             onClick={() =>
                                                 setShowVoters(!showVoters)
@@ -222,7 +223,7 @@ const SingleName = ({
             </div>
 
             {/* Expanded voters list */}
-            {showVoters && totalVotes > 0 && (
+            {isAdmin && showVoters && totalVotes > 0 && (
                 <div className="border-t border-white/40 bg-white/30 px-4 py-3">
                     <h4 className="text-sm font-semibold text-gray-900 mb-2">
                         Voted by ({uniqueVoters.length})

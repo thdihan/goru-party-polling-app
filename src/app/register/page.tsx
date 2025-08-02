@@ -26,7 +26,7 @@ const RegisterForm = () => {
 
     // Pre-fill email from URL parameter (from Google OAuth redirect)
     useEffect(() => {
-        const emailParam = searchParams.get("email");
+        const emailParam = searchParams ? searchParams.get("email") : null;
         if (emailParam) {
             setFormData((prev) => ({
                 ...prev,
@@ -289,15 +289,17 @@ const RegisterForm = () => {
                             name="email"
                             value={formData.email}
                             onChange={handleInputChange}
-                            disabled={!!searchParams.get("email")}
+                            disabled={
+                                !!(searchParams && searchParams.get("email"))
+                            }
                             className={`border border-gray-300 w-full p-2 rounded-md text-sm ${
-                                searchParams.get("email")
+                                searchParams && searchParams.get("email")
                                     ? "bg-gray-100 text-gray-600 cursor-not-allowed"
                                     : "focus:outline-gray-400"
                             }`}
                             placeholder="Email (@iut-dhaka.edu)"
                         />
-                        {searchParams.get("email") ? (
+                        {searchParams && searchParams.get("email") ? (
                             <p className="text-xs text-gray-500 mt-1">
                                 Email verified through Google authentication
                             </p>
