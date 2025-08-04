@@ -11,6 +11,7 @@ import {
     FiAlertCircle,
     FiEye,
     FiUser,
+    FiDownload,
 } from "react-icons/fi";
 
 interface PermissionData {
@@ -27,6 +28,7 @@ export default function GrantPermissionPage() {
     const [previewData, setPreviewData] = useState<PermissionData[]>([]);
     const [showPreview, setShowPreview] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
+    const [isExporting, setIsExporting] = useState(false);
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
     const [result, setResult] = useState<{
         success: boolean;
@@ -246,6 +248,37 @@ export default function GrantPermissionPage() {
         }
     };
 
+    const handleExportPolls = async () => {
+        setIsExporting(true);
+        try {
+            const response = await fetch("/api/export-polls");
+
+            if (!response.ok) {
+                throw new Error("Failed to export polls");
+            }
+
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = `poll-results-${
+                new Date().toISOString().split("T")[0]
+            }.xlsx`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+        } catch (error) {
+            alert(
+                error instanceof Error
+                    ? error.message
+                    : "Failed to export polls"
+            );
+        } finally {
+            setIsExporting(false);
+        }
+    };
+
     return (
         <div className="min-h-screen px-4 py-4 bg-gradient-to-br from-pink-200 via-yellow-100 to-sky-200">
             {/* Header */}
@@ -260,7 +293,23 @@ export default function GrantPermissionPage() {
                 <h1 className="text-2xl font-bold text-slate-800">
                     Grant Permissions
                 </h1>
-                <div></div>
+                <button
+                    onClick={handleExportPolls}
+                    disabled={isExporting}
+                    className="flex items-center gap-2 rounded-md bg-green-600 py-2 px-4 border border-transparent text-center text-sm text-white transition-all shadow-md hover:shadow-lg focus:bg-green-700 focus:shadow-none active:bg-green-700 hover:bg-green-700 active:shadow-none disabled:pointer-events-none disabled:opacity-50 disabled:shadow-none cursor-pointer font-semibold"
+                >
+                    {isExporting ? (
+                        <div className="flex items-center gap-2">
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                            Exporting...
+                        </div>
+                    ) : (
+                        <>
+                            <FiDownload className="text-sm" />
+                            Export Results
+                        </>
+                    )}
+                </button>
             </div>
 
             {/* Main Content */}
@@ -564,6 +613,74 @@ export default function GrantPermissionPage() {
                             </div>
                         </div>
                     )}
+                </div>
+
+                {/* Export Information Section */}
+                <div className="mt-8 backdrop-blur-md bg-white/40 border border-white/30 shadow-xl p-6 rounded-xl">
+                    <div className="flex items-center gap-2 mb-4">
+                        <FiDownload className="text-slate-600" />
+                        <h2 className="text-lg font-semibold text-slate-800">
+                            Export Poll Results
+                        </h2>
+                    </div>
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                        <h3 className="font-semibold text-green-800 mb-2">
+                            Excel Export Features:
+                        </h3>
+                        <ul className="text-sm text-green-700 space-y-1">
+                            <li>
+                                • <strong>Summary Sheet:</strong> Overview of
+                                all polls with basic statistics
+                            </li>
+                            <li>
+                                • <strong>Individual Poll Sheets:</strong>{" "}
+                                Detailed results for each poll
+                            </li>
+                            <li>
+                                • <strong>Poll Names:</strong> All suggested
+                                names with vote counts
+                            </li>
+                            <li>
+                                • <strong>Name Suggesters:</strong> Who
+                                suggested each name
+                            </li>
+                            <li>
+                                • <strong>Voter Lists:</strong> Complete list of
+                                voters for each name
+                            </li>
+                            <li>
+                                • <strong>Voter Analysis:</strong> Individual
+                                voter activity and voting patterns
+                            </li>
+                            <li>
+                                • <strong>Statistics Sheet:</strong> Overall
+                                statistics and top voted names
+                            </li>
+                        </ul>
+                    </div>
+                    <div className="mt-4 text-center">
+                        <button
+                            onClick={handleExportPolls}
+                            disabled={isExporting}
+                            className="inline-flex items-center gap-2 rounded-md bg-green-600 py-3 px-6 border border-transparent text-center text-sm text-white transition-all shadow-md hover:shadow-lg focus:bg-green-700 focus:shadow-none active:bg-green-700 hover:bg-green-700 active:shadow-none disabled:pointer-events-none disabled:opacity-50 disabled:shadow-none cursor-pointer font-semibold"
+                        >
+                            {isExporting ? (
+                                <div className="flex items-center gap-2">
+                                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                                    Generating Excel File...
+                                </div>
+                            ) : (
+                                <>
+                                    <FiDownload className="text-sm" />
+                                    Download Poll Results Excel
+                                </>
+                            )}
+                        </button>
+                        <p className="text-xs text-slate-500 mt-2">
+                            Downloads a comprehensive Excel file with all poll
+                            data
+                        </p>
+                    </div>
                 </div>
             </div>
         </div>
